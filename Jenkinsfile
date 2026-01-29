@@ -3,6 +3,7 @@ pipeline {
     environment {
         APP_NAME = 'laravel-app'
         CLOUDFLARE_TUNNEL_TOKEN = credentials('cloudflare-tunnel-token')
+        DB_PASSWORD = credentials('laravel-db-password')
     }
     stages {
         stage('Checkout') {
@@ -13,18 +14,28 @@ pipeline {
         }
         stage('Setup') {
             steps {
-                echo '<[ Setup environment before build ]>'
+                echo '<[ Setting up environment ]>'
                 sh '''
                     if [ ! -f .env ]; then
                         cp .env.example .env
                     fi
 
+                    docker run --rm \
+                        -u "$(id -u):$(id -g)" \
+                        -v $(pwd):/var/www/html \
+                        -w /var/www/html \
+                        laravelsail/php82-composer:latest \
+                        composer install --ignore-platform-reqs --no-interaction
+                '''
+
+                sh '''
+                    ./vendor/bin/sail artisan key:generate --force
                     sed -i 's/DB_CONNECTION=sqlite/DB_CONNECTION=mysql/' .env
                     sed -i 's/# DB_HOST=127.0.0.1/DB_HOST=mysql/' .env
                     sed -i 's/# DB_PORT=3306/DB_PORT=3306/' .env
                     sed -i 's/# DB_DATABASE=laravel/DB_DATABASE=laravel/' .env
                     sed -i 's/# DB_USERNAME=root/DB_USERNAME=sail/' .env
-                    sed -i 's/# DB_PASSWORD=/DB_PASSWORD=password/' .env
+                    sed -i "s|# DB_PASSWORD=|DB_PASSWORD=${DB_PASSWORD}|" .env
                     sed -i "s|CLOUDFLARE_TUNNEL_TOKEN=.*|CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}|" .env
                     sed -i 's/REDIS_HOST=127.0.0.1/REDIS_HOST=redis/' .env
                     sed -i 's/SESSION_DRIVER=database/SESSION_DRIVER=redis/' .env
@@ -32,68 +43,41 @@ pipeline {
                     sed -i 's/APP_ENV=local/APP_ENV=production/' .env
                     sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' .env
 
-                    if [ ! -d "vendor" ]; then
-                        docker run --rm \
-                            -u "$(id -u):$(id -g)" \
-                            -v $(pwd):/var/www/html \
-                            -w /var/www/html \
-                            laravelsail/php82-composer:latest \
-                            composer install --ignore-platform-reqs --no-interaction
-                    fi
-
-                    chmod +x vendor/bin/sail
-                '''
-            }
-        }
-        stage('Build') {
-            steps {
-                echo '<[ Building application ]>'
-                sh '''
-                    ./vendor/bin/sail down || true
-                    ./vendor/bin/sail up -d --build
-
-                    sleep 15
-
-                    if ! grep -q "APP_KEY=base64:" .env; then
-                        ./vendor/bin/sail artisan key:generate --force
-                    fi
-
-                    ./vendor/bin/sail artisan migrate --force
+                    # Setup Redis
+                    sed -i 's/REDIS_HOST=127.0.0.1/REDIS_HOST=redis/' .env
+                    sed -i 's/SESSION_DRIVER=database/SESSION_DRIVER=redis/' .env
+                    sed -i 's/CACHE_STORE=database/CACHE_STORE=redis/' .env
                 '''
             }
         }
         stage('Test') {
             steps {
                 echo '<[ Running tests ]>'
+                sh 'chmod +x vendor/bin/sail'
                 sh './vendor/bin/sail artisan test || true'
             }
         }
-        stage('Deploy') {
+        stage('Deploy & Build') {
             steps {
-                echo '<[ Deploying application ]>'
+                echo '<[ Deploying & Building Assets ]>'
                 sh '''
-                    ./vendor/bin/sail up -d
+                    ./vendor/bin/sail up -d --build
 
                     sleep 15
 
                     ./vendor/bin/sail artisan migrate --force
-
-                    ./vendor/bin/sail artisan config:clear
-                    ./vendor/bin/sail artisan cache:clear
-                    ./vendor/bin/sail artisan view:clear
-                    ./vendor/bin/sail artisan route:clear
-
                     ./vendor/bin/sail artisan config:cache
+                    ./vendor/bin/sail artisan event:cache
                     ./vendor/bin/sail artisan route:cache
                     ./vendor/bin/sail artisan view:cache
 
-                    if [ -f "package.json" ]; then
-                        ./vendor/bin/sail npm install
-                        ./vendor/bin/sail npm run build
-                    fi
+                    ./vendor/bin/sail artisan queue:restart
 
-                    ./vendor/bin/sail exec laravel.test chmod -R 775 storage bootstrap/cache
-                    ./vendor/bin/sail exec laravel.test chown -R sail:sail storage bootstrap/cache
+                    ./vendor/bin/sail npm install
+                    ./vendor/bin/sail npm run build
+
+                    ./vendor/bin/sail exec -u root laravel.test chown -R sail:sail storage bootstrap/cache
+                    ./vendor/bin/sail exec -u root laravel.test chmod -R 775 storage bootstrap/cache
                 '''
             }
         }
@@ -101,7 +85,6 @@ pipeline {
     post {
         success {
             echo '<[ Deployment successful! ]>'
-            echo '<[ Application is running at http://localhost ]>'
         }
         failure {
             echo '<[ Deployment failed! ]>'

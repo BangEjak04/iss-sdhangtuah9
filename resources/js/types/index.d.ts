@@ -1,5 +1,22 @@
+import { InertiaLinkProps } from "@inertiajs/react";
+import { LucideIcon } from "lucide-react";
+
 export interface Auth {
     user: User;
+}
+
+export interface BreadcrumbItem {
+    title: string;
+    href: string;
+}
+
+
+export interface NavItem {
+    title: string;
+    description?: string;
+    href: NonNullable<InertiaLinkProps['href']>;
+    icon?: LucideIcon | null;
+    isActive?: boolean;
 }
 
 export interface SharedData {
@@ -17,4 +34,9 @@ export interface User {
     created_at: string;
     updated_at: string;
     [key: string]: unknown; // This allows for additional properties...
+}
+
+export interface PlanetModelProps {
+  position?: [number, number, number]
+  scale?: number
 }
