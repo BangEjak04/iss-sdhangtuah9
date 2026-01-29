@@ -6,7 +6,7 @@ import * as THREE from "three"
 
 import Surface from "@/assets/textures/2k_uranus.jpg"
 
-export default function UranusModel({ position, scale }: PlanetModelProps) {
+export default function UranusModel({ position }: PlanetModelProps) {
   const modelRef = useRef<THREE.Mesh>(null!)
 
   const [surface] = useTexture([

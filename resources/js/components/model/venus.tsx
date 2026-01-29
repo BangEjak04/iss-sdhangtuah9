@@ -6,7 +6,7 @@ import * as THREE from "three"
 
 import Surface from "@/assets/textures/2k_venus_surface.jpg"
 
-export default function VenusModel({ position, scale }: PlanetModelProps) {
+export default function VenusModel({ position }: PlanetModelProps) {
   const modelRef = useRef<THREE.Mesh>(null!)
 
   const [surface] = useTexture([

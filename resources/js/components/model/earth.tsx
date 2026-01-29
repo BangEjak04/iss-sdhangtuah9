@@ -10,7 +10,7 @@ import EarthNormalMap from "@/assets/textures/2k_earth_normal_map.jpg"
 import EarthSpecularMap from "@/assets/textures/2k_earth_specular_map.jpg"
 import EarthCloudsMap from "@/assets/textures/2k_earth_clouds.jpg"
 
-export default function EarthModel({ position, scale }: PlanetModelProps) {
+export default function EarthModel({ position }: PlanetModelProps) {
   const modelRef = useRef<THREE.Mesh>(null!)
   const cloudRef = useRef<THREE.Mesh>(null!)
 

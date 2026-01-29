@@ -29,7 +29,6 @@ pipeline {
                 '''
 
                 sh '''
-                    ./vendor/bin/sail artisan key:generate --force
                     sed -i 's/DB_CONNECTION=sqlite/DB_CONNECTION=mysql/' .env
                     sed -i 's/# DB_HOST=127.0.0.1/DB_HOST=mysql/' .env
                     sed -i 's/# DB_PORT=3306/DB_PORT=3306/' .env
@@ -65,6 +64,7 @@ pipeline {
 
                     sleep 15
 
+                    ./vendor/bin/sail artisan key:generate --force
                     ./vendor/bin/sail artisan migrate --force
                     ./vendor/bin/sail artisan config:cache
                     ./vendor/bin/sail artisan event:cache

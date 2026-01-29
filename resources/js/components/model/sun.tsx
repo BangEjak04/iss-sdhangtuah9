@@ -5,7 +5,7 @@ import * as THREE from "three"
 
 import Surface from "@/assets/textures/2k_sun.jpg"
 
-export default function SunModel({ position, scale }: PlanetModelProps) {
+export default function SunModel({ position }: PlanetModelProps) {
   const modelRef = useRef<THREE.Mesh>(null!)
 
   const [surface] = useTexture([
