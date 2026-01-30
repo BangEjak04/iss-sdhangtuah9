@@ -63,9 +63,7 @@ pipeline {
                     ./vendor/bin/sail up -d --build
 
                     sleep 15
-
-                    ./vendor/bin/sail artisan key:generate --force
-                    ./vendor/bin/sail artisan migrate --force
+                    
                     ./vendor/bin/sail artisan config:cache
                     ./vendor/bin/sail artisan event:cache
                     ./vendor/bin/sail artisan route:cache
