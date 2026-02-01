@@ -19,13 +19,6 @@ pipeline {
                     if [ ! -f .env ]; then
                         cp .env.example .env
                     fi
-
-                    docker run --rm \
-                        -u "$(id -u):$(id -g)" \
-                        -v $(pwd):/var/www/html \
-                        -w /var/www/html \
-                        laravelsail/php82-composer:latest \
-                        composer install --ignore-platform-reqs --no-interaction
                 '''
 
                 sh '''
@@ -47,6 +40,14 @@ pipeline {
                     sed -i 's/SESSION_DRIVER=database/SESSION_DRIVER=redis/' .env
                     sed -i 's/CACHE_STORE=database/CACHE_STORE=redis/' .env
                 '''
+
+                sh 'docker compose down'
+                sh 'docker compose up -d --build'
+                sh 'docker-compose exec -T php composer install'
+                sh 'docker-compose exec -T php npm install'
+                sh 'docker-compose exec -T php php artisan key:generate'
+                sh 'docker-compose exec -T php php artisan migrate:fresh --seed'
+                sh 'docker-compose exec -T php npm run build'
             }
         }
         stage('Test') {
@@ -56,29 +57,29 @@ pipeline {
                 sh './vendor/bin/sail artisan test || true'
             }
         }
-        stage('Deploy & Build') {
-            steps {
-                echo '<[ Deploying & Building Assets ]>'
-                sh '''
-                    ./vendor/bin/sail up -d --build
+        // stage('Deploy & Build') {
+        //     steps {
+        //         echo '<[ Deploying & Building Assets ]>'
+        //         sh '''
+        //             ./vendor/bin/sail up -d --build
 
-                    sleep 15
+        //             sleep 15
                     
-                    ./vendor/bin/sail artisan config:cache
-                    ./vendor/bin/sail artisan event:cache
-                    ./vendor/bin/sail artisan route:cache
-                    ./vendor/bin/sail artisan view:cache
+        //             ./vendor/bin/sail artisan config:cache
+        //             ./vendor/bin/sail artisan event:cache
+        //             ./vendor/bin/sail artisan route:cache
+        //             ./vendor/bin/sail artisan view:cache
 
-                    ./vendor/bin/sail artisan queue:restart
+        //             ./vendor/bin/sail artisan queue:restart
 
-                    ./vendor/bin/sail npm install
-                    ./vendor/bin/sail npm run build
+        //             ./vendor/bin/sail npm install
+        //             ./vendor/bin/sail npm run build
 
-                    ./vendor/bin/sail exec -u root laravel.test chown -R sail:sail storage bootstrap/cache
-                    ./vendor/bin/sail exec -u root laravel.test chmod -R 775 storage bootstrap/cache
-                '''
-            }
-        }
+        //             ./vendor/bin/sail exec -u root laravel.test chown -R sail:sail storage bootstrap/cache
+        //             ./vendor/bin/sail exec -u root laravel.test chmod -R 775 storage bootstrap/cache
+        //         '''
+        //     }
+        // }
     }
     post {
         success {
